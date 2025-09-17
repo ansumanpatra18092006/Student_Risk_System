@@ -1,0 +1,10 @@
+# Environment variables
+.env
+twilio.env
+
+# Python virtual environment
+student_risk_env/
+
+# Python cache
+__pycache__/
+*.pyc

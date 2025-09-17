@@ -29,6 +29,13 @@ CORS(app)
 
 # --- Configuration ---
 DATABASE = 'student_risk.db'
+
+DATA_DIR = os.environ.get('RENDER_DISK_PATH', '.') 
+DATABASE = os.path.join(DATA_DIR, 'student_risk.db')
+MODEL_PATH = os.path.join(DATA_DIR, 'MODEL_PATH')
+SCALER_PATH = os.path.join(DATA_DIR, 'SCALER_PATH')
+MODEL_COLUMNS_PATH = os.path.join(DATA_DIR, 'MODEL_COLUMNS_PATH')
+PERFORMANCE_PATH = os.path.join(DATA_DIR, 'PERFORMANCE_PATH')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -69,9 +76,9 @@ class StudentRiskAnalyzer:
         self.is_trained = False
         self.risk_weights = {'attendance': 0.35, 'academic_performance': 0.40, 'fee_status': 0.15, 'backlogs': 0.10}
         try:
-            self.model = joblib.load('risk_model.joblib')
-            self.scaler = joblib.load('scaler.joblib')
-            self.model_columns = joblib.load('model_columns.joblib')
+            self.model = joblib.load('MODEL_PATH')
+            self.scaler = joblib.load('SCALER_PATH')
+            self.model_columns = joblib.load('MODEL_COLUMNS_PATH')
             self.is_trained = True
             print("Trained model loaded successfully.")
         except FileNotFoundError:
@@ -133,7 +140,7 @@ def reset_db():
     try:
         close_db()
         if os.path.exists(DATABASE): os.remove(DATABASE)
-        if os.path.exists('model_performance.json'): os.remove('model_performance.json')
+        if os.path.exists('PERFORMANCE_PATH'): os.remove('PERFORMANCE_PATH')
         init_db()
         return jsonify({"message": "Database reset successfully."}), 200
     except Exception as e:
@@ -167,10 +174,10 @@ def train_model_endpoint():
         report = classification_report(y_test, predictions, output_dict=True)
         performance_metrics = {'accuracy': accuracy, 'precision': report['weighted avg']['precision'],
                                'recall': report['weighted avg']['recall'], 'f1_score': report['weighted avg']['f1-score']}
-        with open('model_performance.json', 'w') as f: json.dump(performance_metrics, f)
-        joblib.dump(model, 'risk_model.joblib')
-        joblib.dump(scaler, 'scaler.joblib')
-        joblib.dump(model_columns, 'model_columns.joblib')
+        with open('PERFORMANCE_PATH', 'w') as f: json.dump(performance_metrics, f)
+        joblib.dump(model, 'MODEL_PATH')
+        joblib.dump(scaler, 'SCALER_PATH')
+        joblib.dump(model_columns, 'MODEL_COLUMNS_PATH')
         global risk_analyzer
         risk_analyzer = StudentRiskAnalyzer()
         log_activity('MODEL_TRAINED', f"New model trained with {accuracy*100:.2f}% accuracy.", 'SUCCESS')
@@ -331,7 +338,7 @@ def send_communication():
 @app.route('/api/dashboard', methods=['GET'])
 def get_dashboard_stats():
     try:
-        with open('model_performance.json', 'r') as f: model_performance = json.load(f)
+        with open('PERFORMANCE_PATH', 'r') as f: model_performance = json.load(f)
     except FileNotFoundError: model_performance = {'accuracy': 0, 'precision': 0, 'recall': 0, 'f1_score': 0}
     db = get_db()
     total_students = db.execute('SELECT COUNT(*) FROM students').fetchone()[0]
